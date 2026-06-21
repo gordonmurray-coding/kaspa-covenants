@@ -22,7 +22,7 @@ This repo grew out of a build log: every covenant mechanism was implemented as t
 possible script, confirmed on-chain, and only then composed. The staged proofs are kept
 because they're the clearest way to understand each primitive in isolation.
 
-### Suggested layout
+### What's included
 
 ```
 kaspa-covenants/
