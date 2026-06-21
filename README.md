@@ -45,8 +45,6 @@ kaspa-covenants/
     └── kaspa_agent_covenant_3b_adversarial.py   # the 6-attack battery
 ```
 
-(The files currently sit flat; move them into the folders above when you initialize the repo.)
-
 ## How covenants do this
 
 Toccata (KIP-17) adds **transaction-introspection opcodes**: a script can read the very
