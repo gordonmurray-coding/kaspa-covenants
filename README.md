@@ -131,8 +131,6 @@ is the authoritative node/operator reference.
 
 ## License
 
-## License
-
 This project is licensed under the [MIT License](LICENSE) — use at your own risk; unaudited research code.
 
 ## Acknowledgements
