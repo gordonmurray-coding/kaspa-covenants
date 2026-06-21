@@ -131,7 +131,9 @@ is the authoritative node/operator reference.
 
 ## License
 
-MIT (suggested — add a `LICENSE` file). Use at your own risk; unaudited research code.
+## License
+
+This project is licensed under the [MIT License](LICENSE) — use at your own risk; unaudited research code.
 
 ## Acknowledgements
 
