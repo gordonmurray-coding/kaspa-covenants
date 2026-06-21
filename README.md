@@ -1,4 +1,4 @@
-# kaspa-covenants — a stateful agent-budget covenant, proven on-chain
+# Kaspa-Covenants — a stateful agent-budget covenant, proven on-chain
 
 Programmable, self-enforcing spending limits on Kaspa, built in raw script and verified
 against live consensus on **testnet-10**, ahead of the **Toccata** mainnet activation
