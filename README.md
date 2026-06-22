@@ -1,4 +1,4 @@
-# kaspa-covenants — a stateful agent-budget covenant, proven on-chain
+# Kaspa-Covenants — a stateful agent-budget covenant, proven on-chain
 
 Programmable, self-enforcing spending limits on Kaspa, built in raw script and verified
 against live consensus on **testnet-10**, ahead of the **Toccata** mainnet activation
@@ -22,7 +22,7 @@ This repo grew out of a build log: every covenant mechanism was implemented as t
 possible script, confirmed on-chain, and only then composed. The staged proofs are kept
 because they're the clearest way to understand each primitive in isolation.
 
-### Suggested layout
+### What's included
 
 ```
 kaspa-covenants/
@@ -44,8 +44,6 @@ kaspa-covenants/
 └── adversarial/
     └── kaspa_agent_covenant_3b_adversarial.py   # the 6-attack battery
 ```
-
-(The files currently sit flat; move them into the folders above when you initialize the repo.)
 
 ## How covenants do this
 
@@ -133,7 +131,7 @@ is the authoritative node/operator reference.
 
 ## License
 
-MIT (suggested — add a `LICENSE` file). Use at your own risk; unaudited research code.
+This project is licensed under the [MIT License](LICENSE) — use at your own risk; unaudited research code.
 
 ## Acknowledgements
 
