@@ -57,6 +57,8 @@ The claim transaction
 [kaspa.stream](https://kaspa.stream) into exactly the script built above. Confirmed in
 126 ms; one input from the HTLC address, one output to the taker.
 
+![Decoded claim transaction on kaspa.stream](claim-tx.png)
+
 **The signature script (the witness that unlocks the funds):**
 
 | # | Op | Data | What it is |
