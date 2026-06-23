@@ -2,7 +2,7 @@
 
 ### A stateful, self-enforcing agent-budget covenant on Kaspa — built in raw script and proven on-chain ahead of Toccata
 
-> **TL;DR.** Using Kaspa's covenant opcodes on testnet-10, I built a wallet whose spending rules are enforced by the network instead of by the wallet's software: a per-period budget that automatically refills, a per-spend cap, a destination allowlist, an exact protocol fee, and an owner recovery path — all carried as state inside the script itself and rebuilt every time the funds move. Then I attacked it. Six transactions that each broke one rule, every one signed with the legitimate agent key and submitted straight to a node, were all rejected by the script. The limits hold even against an operator who controls the wallet's code. Everything here runs against Toccata-class consensus, which activates on Kaspa mainnet on **June 30, 2026**.
+> **TL;DR.** Using Kaspa's covenant opcodes on testnet-10, I built a wallet whose spending rules are enforced by the network instead of by the wallet's software: a per-period budget that automatically refills, a per-spend cap, a destination allowlist, an exact protocol fee, and an owner recovery path — all carried as state inside the script itself and rebuilt every time the funds move. Then I attacked it. Six transactions that each broke one rule, every one signed with the legitimate agent key and submitted straight to a node, were all rejected by the script. The limits hold even against an operator who controls the wallet's code. The same building blocks, recomposed, then yield two more instruments — a trustless atomic-swap leg and an arbitrated escrow whose arbiter can settle a dispute but provably cannot steal — each likewise verified on-chain. Everything here runs against Toccata-class consensus, which activates on Kaspa mainnet on **June 30, 2026**.
 
 ---
 
@@ -81,9 +81,49 @@ What it **does** show is that the UTXO-local model, given good introspection pri
 
 The contrast with Bitcoin is hard to miss. Bitcoin's community has debated covenant proposals (OP_CTV, OP_CAT, and relatives) for years without activation. Kaspa, working partly in the slipstream of that same OP_CAT discussion, is shipping covenants — plus introspection, covenant IDs, and ZK verification — in a single coordinated upgrade. For builders who want programmable money that stays close to the metal and settles fast, that's a meaningfully different proposition.
 
+## The same parts, recomposed: swaps and escrow
+
+A budget covenant is one instrument. The more general claim is that the underlying parts —
+output-constraint introspection, self-templating state, the unforgeable lock-time clock, plus
+two smaller primitives added along the way — compose into other useful things. Two of them,
+built on the same testnet and verified the same way, make the point.
+
+The first is a **hash time-locked contract**, the atomic-swap building block. Funds lock to
+two paths: a *claim* path that pays out only when the spender reveals a secret whose `blake2b`
+hash matches a committed value (plus their signature), and a *refund* path that returns the
+funds to the maker after a timeout. The only new mechanic is the hashlock — one `blake2b`
+opcode and an equality check; everything else is the timelock and signature machinery the
+budget covenant already used. Both paths confirmed on-chain. The interesting moment is the
+claim: spending it writes the secret permanently into the transaction, and that public
+reveal is exactly what lets a counterparty unlock the mirror leg of a cross-chain swap. No
+escrow agent, no custody — the atomicity is a property of the script.
+
+The second is an **arbitrated escrow**, and it shows off the property that distinguishes a
+covenant from a plain multisig: an authority that can decide but cannot steal. Buyer, seller,
+and arbiter; two paths. A cooperative *settle* path requires the buyer and seller to co-sign
+(a two-signature branch — N-of-M without a multisig opcode). A *resolve* path lets the arbiter
+sign alone to break a dispute, but introspection pins the result to exactly one output, paid
+to the buyer's or the seller's registered address, at full value. The arbiter chooses the
+winner and is structurally incapable of routing the money anywhere else. The same adversarial
+treatment as the budget covenant confirms it: four attacks — an off-allowlist payout, a
+two-output skim, an underpayment, and an attempt to masquerade through the cooperative path —
+each signed with the genuine arbiter key, each rejected by the script. A compromised arbiter
+holding a valid key still captures nothing.
+
+Building these surfaced consensus details that no amount of spec-reading would have caught,
+which is the recurring lesson of working in raw script. Kaspa makes each input commit to a
+signature-operation budget, so the escrow's two-signature path had to declare it (and before
+signing, since that commitment is itself signed). And the bitwise `OR` opcode requires its
+operands to be the same byte-length — so combining "matches address A *or* address B" checks,
+whose true/false results differ in length, hard-errors the moment a multi-entry allowlist
+matches on anything but the first entry. The fix is to add the boolean results as numbers
+instead. That bug had been sitting latent in the budget covenant's allowlist, invisible
+because every test had used a single entry; it only revealed itself when the escrow exercised
+two. Both the lesson and the fix are in the repository.
+
 ## Reproduce it
 
-All of the code — the staged proofs, the full covenant, the adversarial probe, and the consensus-semantics probes used to verify each primitive — is in the repository accompanying this article. Everything was built against Kaspa testnet-10 using the `kaspa` Python SDK, ahead of the June 30 mainnet activation. The covenant is research-grade and unaudited; treat it as a demonstration of what the primitives make possible, not as a drop-in production wallet.
+All of the code — the staged proofs, the full covenant, the adversarial probes for both the budget covenant and the escrow, the swap and escrow primitives, and the consensus-semantics probes used to verify each primitive — is in the repository accompanying this article. Everything was built against Kaspa testnet-10 using the `kaspa` Python SDK, ahead of the June 30 mainnet activation. The covenants are research-grade and unaudited; treat them as a demonstration of what the primitives make possible, not as drop-in production wallets.
 
 If you want to go deeper on the language side rather than the bytes, SilverScript is the official high-level path to the same primitives, and the rusty-kaspa Toccata guide is the authoritative reference for node operators and the post-activation fee and mass rules.
 
@@ -103,4 +143,4 @@ If you want to go deeper on the language side rather than the bytes, SilverScrip
 - Kaspa Improvement Proposals: KIP-16 (ZK opcodes), KIP-17 (covenant opcodes), KIP-20 (covenant IDs), KIP-21 (sequencing commitments)
 - Toccata mainnet activation: June 30, 2026, DAA score 474,165,565
 
-*Built and verified on Kaspa testnet-10. Author: Gordon Murray, Kaspa Researcher*
+*Built and verified on Kaspa testnet-10. Author: add your byline.*

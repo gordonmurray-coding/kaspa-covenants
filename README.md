@@ -1,11 +1,17 @@
-# Kaspa-Covenants — a stateful agent-budget covenant, proven on-chain
+# kaspa-covenants — stateful covenants on Kaspa, proven on-chain
 
-Programmable, self-enforcing spending limits on Kaspa, built in raw script and verified
+Programmable, self-enforcing transaction rules on Kaspa, built in raw script and verified
 against live consensus on **testnet-10**, ahead of the **Toccata** mainnet activation
 (June 30, 2026). The headline artifact is an agent-budget wallet whose rules — a rolling
 per-period budget, a per-spend cap, a destination allowlist, an exact protocol fee, value
 conservation, agent authentication, and an owner recovery path — are enforced by the
 network, not by the wallet's software.
+
+The same foundation — introspection output-constraints, self-templating state, unforgeable
+timelocks, hashlocks, multi-signature paths, and bounded delegated authority — is then reused
+to build two more primitives, each proven on-chain: an **HTLC atomic swap** ([`swaps/`](./swaps/))
+and an **arbitrated escrow** ([`escrow/`](./escrow/)) in which the arbiter can settle a
+dispute but is structurally unable to steal.
 
 **The result that matters:** six transactions that each break one rule, every one signed
 with the legitimate agent key and submitted directly to a node, were **all rejected by the
@@ -22,7 +28,7 @@ This repo grew out of a build log: every covenant mechanism was implemented as t
 possible script, confirmed on-chain, and only then composed. The staged proofs are kept
 because they're the clearest way to understand each primitive in isolation.
 
-### What's included
+### Suggested layout
 
 ```
 kaspa-covenants/
@@ -42,8 +48,23 @@ kaspa-covenants/
 │   ├── kaspa_agent_covenant_step3a.py #   3a + agent auth + owner escape
 │   └── kaspa_agent_covenant_step3b.py #   3b + cap + allowlist + fee + conservation  ← full covenant
 └── adversarial/
-    └── kaspa_agent_covenant_3b_adversarial.py   # the 6-attack battery
+    ├── kaspa_agent_covenant_3b_adversarial.py   # 6-attack budget battery
+    └── kaspa_escrow_adversarial.py              # 4-attack escrow battery
 ```
+
+Plus two primitives built on the same foundation:
+
+```
+├── swaps/                              # HTLC atomic-swap primitive
+│   ├── kaspa_htlc_swap.py            #   hashlock claim + timelocked refund
+│   └── README.md                     #   writeup + on-chain anatomy
+└── escrow/                             # arbitrated escrow
+    ├── kaspa_escrow.py               #   two-sig settle + bounded-arbiter resolve
+    ├── kaspa_escrow_adversarial.py   #   (or under adversarial/) the 4-attack battery
+    └── README.md                     #   writeup + bounded-arbiter proof
+```
+
+(The files currently sit flat; move them into the folders above when you initialize the repo.)
 
 ## How covenants do this
 
@@ -95,7 +116,26 @@ Each step isolates one new mechanism and confirms it on-chain before the next bu
 | 2b-2 | `kaspa_rolling_budget.py` | calendar reset: refill-per-period via the `lock_time` clock |
 | 3a | `kaspa_agent_covenant_step3a.py` | two-path branch: agent auth + owner escape |
 | 3b | `kaspa_agent_covenant_step3b.py` | cap + allowlist + exact fee + value conservation |
-| Attack | `adversarial/...py` | every rule rejected by consensus, not the client |
+| Attack | `adversarial/kaspa_agent_covenant_3b_adversarial.py` | every budget rule rejected by consensus, not the client |
+| Swap | `swaps/kaspa_htlc_swap.py` | hashlock claim + timelocked refund — the atomic-swap leg |
+| Escrow | `escrow/kaspa_escrow.py` | two-signature settle + bounded-arbiter resolve (can decide, can't steal) |
+| Attack | `escrow/kaspa_escrow_adversarial.py` | every escrow rule rejected by consensus, not the client |
+
+## Two more primitives
+
+**HTLC atomic swap** — [`swaps/`](./swaps/). Funds locked to two paths: a hashlock *claim*
+(reveal a secret whose `blake2b` equals a committed hash, plus the claimant's signature) and
+a timelocked *refund*. Claiming writes the secret on-chain, which is what lets a counterparty
+unlock the mirror leg of a cross-chain swap. Both paths are confirmed on testnet-10; the
+writeup annotates the live claim transaction opcode-by-opcode.
+
+**Arbitrated escrow** — [`escrow/`](./escrow/). Buyer, seller, and arbiter, two paths: a
+*settle* path where buyer and seller co-sign (a two-signature branch — N-of-M without
+`OpCheckMultiSig`), and a *resolve* path where the arbiter signs alone but introspection pins
+the payout to exactly one output, to the buyer's or seller's address, at full value. Same key,
+the arbiter can confirm a payment to a legitimate party and is rejected when aiming anywhere
+else — proven by an adversarial battery that signs four distinct attacks with the genuine
+arbiter key and watches the covenant refuse each.
 
 ## Practical notes (the gotchas)
 
@@ -109,6 +149,16 @@ Each step isolates one new mechanism and confirms it on-chain before the next bu
   length byte silently corrupts the signature script.
 - **CSV pops its argument** on Kaspa (unlike Bitcoin's non-popping CLTV/CSV) — no trailing
   `OP_DROP`.
+- **Declare the sig-op budget.** Each input commits to a signature-operation count, and the
+  engine rejects a script that runs more checks than committed (`script units exceeded the
+  amount committed in the input`). A path doing N signature checks must set `sig_op_count = N`
+  on the input *before signing* — the field is part of the sighash. Single-signature paths
+  ride the default of 1; the escrow's two-signature settle path is the first to need 2.
+- **Combine booleans with `OpAdd`, not bitwise `OpOr`.** `OpEqual` pushes `0x01` for true and
+  *empty* for false, whose byte-lengths differ; bitwise `OpOr` requires equal-length operands
+  and hard-errors (`OR operands must be of equal length`) the moment a multi-entry allowlist
+  matches a non-first entry. Sum the equality results with `OpAdd` (length-agnostic) and verify
+  the nonzero total instead. This is a real latent bug that an all-rejecting test never reveals.
 - **Don't bake editable parameters into the address.** Anything in the redeem script (fees,
   caps) defines the P2SH address; changing such a constant after building orphans the coin.
   Keep tunables in config.

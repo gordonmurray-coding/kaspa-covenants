@@ -11,7 +11,7 @@ the output shape is pinned to exactly three outputs.
 AGENT path (selector truthy, agent signature), outputs [payee, dev, child]:
   - output count == 3
   - per-spend CAP        : output[0].amount <= CAP
-  - destination WHITELIST : output[0].spk in {approved spks}        (OpBoolOr chain)
+  - destination WHITELIST : output[0].spk in {approved spks}        (OpAdd sum-chain)
   - exact DEV FEE        : output[1].spk == dev  AND  output[1].amount == DEV_FEE
   - value CONSERVATION   : output[0]+output[1]+output[2] + FEE_ALLOWANCE >= input
                            (agent can't bleed the covenant via inflated fees)
@@ -86,11 +86,15 @@ def build_tail(script_len, p):
     b += bytes([0xb4, 0x53, 0x9d])                       # OpTxOutputCount Op3 OpNumEqualVerify
     # ---- rule: per-spend cap  out0.amount <= CAP ----
     b += bytes([0x00, 0xc2]) + push_num(cap) + bytes([0xa1, 0x69])
-    # ---- rule: whitelist  out0.spk in {wls}  (re-read spk per entry, OR-chain) ----
+    # ---- rule: whitelist  out0.spk in {wls}  (re-read spk per entry, sum-chain) ----
+    # Combine equality results with OpAdd, not bitwise OpOr: OpEqual pushes 0x01 / empty,
+    # whose lengths differ, and bitwise ops require equal-length operands (would hard-error
+    # on a real match across >1 entry). Summing the booleans is length-agnostic; the running
+    # total is the match count, and OpVerify passes on any nonzero total.
     for i, wl in enumerate(wls):
         b += bytes([0x00, 0xc3]) + push_data(wl) + bytes([0x87])   # Op0 OpTxOutputSpk wl OpEqual
-        if i: b += bytes([0x85])                                   # OpBoolOr
-    b += bytes([0x69])                                             # OpVerify
+        if i: b += bytes([0x93])                                   # OpAdd (running sum of matches)
+    b += bytes([0x69])                                             # OpVerify (>=1 match -> nonzero)
     # ---- rule: dev fee  out1.spk == dev  &&  out1.amount == DEV_FEE ----
     b += bytes([0x51, 0xc3]) + push_data(dev) + bytes([0x88])      # Op1 OpTxOutputSpk dev OpEqualVerify
     b += bytes([0x51, 0xc2]) + push_num(dev_fee) + bytes([0x9d])   # Op1 OpTxOutputAmount DEV_FEE OpNumEqualVerify
